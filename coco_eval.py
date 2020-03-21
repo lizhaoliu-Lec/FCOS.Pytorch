@@ -8,108 +8,103 @@ import cv2
 from model.fcos import FCOSDetector
 import torch
 
+
 class COCOGenerator(CocoDetection):
     CLASSES_NAME = (
-    '__back_ground__', 'person', 'bicycle', 'car', 'motorcycle',
-    'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
-    'fire hydrant', 'stop sign', 'parking meter', 'bench',
-    'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant',
-    'bear', 'zebra', 'giraffe', 'backpack', 'umbrella',
-    'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard',
-    'sports ball', 'kite', 'baseball bat', 'baseball glove',
-    'skateboard', 'surfboard', 'tennis racket', 'bottle',
-    'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
-    'banana', 'apple', 'sandwich', 'orange', 'broccoli',
-    'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
-    'couch', 'potted plant', 'bed', 'dining table', 'toilet',
-    'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
-    'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
-    'book', 'clock', 'vase', 'scissors', 'teddy bear',
-    'hair drier', 'toothbrush')
-    def __init__(self,imgs_path,anno_path,resize_size=[800,1024]):
-        super().__init__(imgs_path,anno_path)
+        '__back_ground__', 'person', 'bicycle', 'car', 'motorcycle',
+        'airplane', 'bus', 'train', 'truck', 'boat', 'traffic light',
+        'fire hydrant', 'stop sign', 'parking meter', 'bench',
+        'bird', 'cat', 'dog', 'horse', 'sheep', 'cow', 'elephant',
+        'bear', 'zebra', 'giraffe', 'backpack', 'umbrella',
+        'handbag', 'tie', 'suitcase', 'frisbee', 'skis', 'snowboard',
+        'sports ball', 'kite', 'baseball bat', 'baseball glove',
+        'skateboard', 'surfboard', 'tennis racket', 'bottle',
+        'wine glass', 'cup', 'fork', 'knife', 'spoon', 'bowl',
+        'banana', 'apple', 'sandwich', 'orange', 'broccoli',
+        'carrot', 'hot dog', 'pizza', 'donut', 'cake', 'chair',
+        'couch', 'potted plant', 'bed', 'dining table', 'toilet',
+        'tv', 'laptop', 'mouse', 'remote', 'keyboard', 'cell phone',
+        'microwave', 'oven', 'toaster', 'sink', 'refrigerator',
+        'book', 'clock', 'vase', 'scissors', 'teddy bear',
+        'hair drier', 'toothbrush')
+
+    def __init__(self, imgs_path, anno_path, resize_size=[800, 1024]):
+        super().__init__(imgs_path, anno_path)
 
         print("INFO====>check annos, filtering invalid data......")
-        ids=[]
+        ids = []
         for id in self.ids:
-            ann_id=self.coco.getAnnIds(imgIds=id,iscrowd=None)
-            ann=self.coco.loadAnns(ann_id)
+            ann_id = self.coco.getAnnIds(imgIds=id, iscrowd=None)
+            ann = self.coco.loadAnns(ann_id)
             if self._has_valid_annotation(ann):
                 ids.append(id)
-        self.ids=ids
+        self.ids = ids
         self.category2id = {v: i + 1 for i, v in enumerate(self.coco.getCatIds())}
         self.id2category = {v: k for k, v in self.category2id.items()}
 
-        self.resize_size=resize_size
-        self.mean=[0.40789654, 0.44719302, 0.47026115]
-        self.std=[0.28863828, 0.27408164, 0.27809835]
-        
+        self.resize_size = resize_size
+        self.mean = [0.40789654, 0.44719302, 0.47026115]
+        self.std = [0.28863828, 0.27408164, 0.27809835]
 
-    def __getitem__(self,index):
-        
-        img,ann=super().__getitem__(index)
+    def __getitem__(self, index):
+
+        img, ann = super().__getitem__(index)
 
         ann = [o for o in ann if o['iscrowd'] == 0]
         boxes = [o['bbox'] for o in ann]
-        boxes=np.array(boxes,dtype=np.float32)
-        #xywh-->xyxy
-        boxes[...,2:]=boxes[...,2:]+boxes[...,:2]
-        img=np.array(img)
-        
-        img,boxes,scale=self.preprocess_img_boxes(img,boxes,self.resize_size)
+        boxes = np.array(boxes, dtype=np.float32)
+        # xywh-->xyxy
+        boxes[..., 2:] = boxes[..., 2:] + boxes[..., :2]
+        img = np.array(img)
+
+        img, boxes, scale = self.preprocess_img_boxes(img, boxes, self.resize_size)
         # img=draw_bboxes(img,boxes)
-        
 
         classes = [o['category_id'] for o in ann]
         classes = [self.category2id[c] for c in classes]
-        
 
-
-        img=transforms.ToTensor()(img)
-        img= transforms.Normalize(self.mean, self.std,inplace=True)(img)
+        img = transforms.ToTensor()(img)
+        img = transforms.Normalize(self.mean, self.std, inplace=True)(img)
         # boxes=torch.from_numpy(boxes)
-        classes=np.array(classes,dtype=np.int64)
+        classes = np.array(classes, dtype=np.int64)
 
-        return img,boxes,classes,scale
+        return img, boxes, classes, scale
 
-    def preprocess_img_boxes(self,image,boxes,input_ksize):
+    def preprocess_img_boxes(self, image, boxes, input_ksize):
         '''
         resize image and bboxes 
         Returns
         image_paded: input_ksize  
         bboxes: [None,4]
         '''
-        min_side, max_side    = input_ksize
-        h,  w, _  = image.shape
+        min_side, max_side = input_ksize
+        h, w, _ = image.shape
 
-        smallest_side = min(w,h)
-        largest_side=max(w,h)
-        scale=min_side/smallest_side
-        if largest_side*scale>max_side:
-            scale=max_side/largest_side
-        nw, nh  = int(scale * w), int(scale * h)
+        smallest_side = min(w, h)
+        largest_side = max(w, h)
+        scale = min_side / smallest_side
+        if largest_side * scale > max_side:
+            scale = max_side / largest_side
+        nw, nh = int(scale * w), int(scale * h)
         image_resized = cv2.resize(image, (nw, nh))
 
-        pad_w=32-nw%32
-        pad_h=32-nh%32
+        pad_w = 32 - nw % 32
+        pad_h = 32 - nh % 32
 
-        image_paded = np.zeros(shape=[nh+pad_h, nw+pad_w, 3],dtype=np.float32)
+        image_paded = np.zeros(shape=[nh + pad_h, nw + pad_w, 3], dtype=np.float32)
         image_paded[:nh, :nw, :] = image_resized
 
         if boxes is None:
             return image_paded
         else:
-            boxes[:, [0, 2]] = boxes[:, [0, 2]] * scale 
-            boxes[:, [1, 3]] = boxes[:, [1, 3]] * scale 
-            return image_paded, boxes,scale
+            boxes[:, [0, 2]] = boxes[:, [0, 2]] * scale
+            boxes[:, [1, 3]] = boxes[:, [1, 3]] * scale
+            return image_paded, boxes, scale
 
-
-
-    def _has_only_empty_bbox(self,annot):
+    def _has_only_empty_bbox(self, annot):
         return all(any(o <= 1 for o in obj['bbox'][2:]) for obj in annot)
 
-
-    def _has_valid_annotation(self,annot):
+    def _has_valid_annotation(self, annot):
         if len(annot) == 0:
             return False
 
@@ -117,7 +112,7 @@ class COCOGenerator(CocoDetection):
             return False
 
         return True
-    
+
 
 def evaluate_coco(generator, model, threshold=0.05):
     """ Use the pycocotools to evaluate a COCO model on a dataset.
@@ -131,9 +126,9 @@ def evaluate_coco(generator, model, threshold=0.05):
     results = []
     image_ids = []
     for index in tqdm(range(len(generator))):
-        img,gt_boxes,gt_labels,scale = generator[index]
+        img, gt_boxes, gt_labels, scale = generator[index]
         # run network
-        scores, labels,boxes  = model(img.unsqueeze(dim=0))
+        scores, labels, boxes = model(img.unsqueeze(dim=0))
 
         boxes /= scale
         # correct boxes for image scale
@@ -149,10 +144,10 @@ def evaluate_coco(generator, model, threshold=0.05):
 
             # append detection for each positively labeled class
             image_result = {
-                'image_id'    : generator.ids[index],
-                'category_id' : generator.id2category(label),
-                'score'       : float(score),
-                'bbox'        : box.tolist(),
+                'image_id': generator.ids[index],
+                'category_id': generator.id2category(label),
+                'score': float(score),
+                'bbox': box.tolist(),
             }
 
             # append detection to results
@@ -180,8 +175,10 @@ def evaluate_coco(generator, model, threshold=0.05):
     coco_eval.summarize()
     return coco_eval.stats
 
+
 if __name__ == "__main__":
-    generator=COCOGenerator("/home/data/coco2017/val2017","/home/data/coco2017/instances_val2017.json")
-    model=FCOSDetector(mode="inference")
-    model.load_state_dict(torch.load("./logs/1121/coco2017_multigpu_800x1024_epoch4_loss1.2863.pth",map_location=torch.device('cpu')))
-    evaluate_coco(generator,model)
+    generator = COCOGenerator("/home/data/coco2017/val2017", "/home/data/coco2017/instances_val2017.json")
+    model = FCOSDetector(mode="inference")
+    model.load_state_dict(
+        torch.load("./logs/1121/coco2017_multigpu_800x1024_epoch4_loss1.2863.pth", map_location=torch.device('cpu')))
+    evaluate_coco(generator, model)

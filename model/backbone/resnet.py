@@ -2,7 +2,7 @@ import torch.nn as nn
 import torch.utils.model_zoo as model_zoo
 import math
 
-__all__=['resnet18', 'resnet34', 'resnet50', 'resnet101','resnet152']
+__all__ = ['resnet18', 'resnet34', 'resnet50', 'resnet101', 'resnet152']
 
 model_urls = {
     'resnet18': 'https://download.pytorch.org/models/resnet18-5c106cde.pth',
@@ -12,10 +12,12 @@ model_urls = {
     'resnet152': 'https://download.pytorch.org/models/resnet152-b121ed2d.pth',
 }
 
+
 def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
                      padding=1, bias=False)
+
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -47,6 +49,8 @@ class BasicBlock(nn.Module):
         out = self.relu(out)
 
         return out
+
+
 class Bottleneck(nn.Module):
     # ResNet-B
     expansion = 4
@@ -85,9 +89,11 @@ class Bottleneck(nn.Module):
         out = self.relu(out)
 
         return out
+
+
 class ResNet(nn.Module):
 
-    def __init__(self, block, layers, num_classes=1000,if_include_top=False):
+    def __init__(self, block, layers, num_classes=1000, if_include_top=False):
         self.inplanes = 64
         super(ResNet, self).__init__()
         self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
@@ -102,8 +108,8 @@ class ResNet(nn.Module):
         self.avgpool = nn.AvgPool2d(7, stride=1)
         if if_include_top:
             self.fc = nn.Linear(512 * block.expansion, num_classes)
-        self.if_include_top=if_include_top
-        
+        self.if_include_top = if_include_top
+
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
@@ -147,12 +153,12 @@ class ResNet(nn.Module):
             return x
         else:
             return (out3, out4, out5)
-    
+
     def freeze_bn(self):
         for layer in self.modules():
             if isinstance(layer, nn.BatchNorm2d):
                 layer.eval()
-    
+
     def freeze_stages(self, stage):
         if stage >= 0:
             self.bn1.eval()
@@ -164,7 +170,8 @@ class ResNet(nn.Module):
             layer.eval()
             for param in layer.parameters():
                 param.requires_grad = False
-                
+
+
 def resnet18(pretrained=False, **kwargs):
     """Constructs a ResNet-18 model.
     Args:
